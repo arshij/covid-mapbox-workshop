@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>Mapping the COVID-19 Crisis with Mapbox</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v1.10.0/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v1.10.0/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    .legend {
+      background-color: #fff;
+      border-radius: 3px;
+      bottom: 30px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      font: 12px/20px "Helvetica Neue", Arial, Helvetica, sans-serif;
+      padding: 10px;
+      position: absolute;
+      right: 10px;
+      z-index: 1;
+    }
+
+    .legend h4 {
+      margin: 0 0 10px;
+    }
+
+    .legend div span {
+      border-radius: 50%;
+      display: inline-block;
+      height: 10px;
+      margin-right: 5px;
+      width: 10px;
+    }
+
+    #fly-sf {
+			position: fixed;
+      display: inline-block;
+      margin: 0px auto;
+      height: 30px;
+      padding: 5px;
+      border: none;
+      border-radius: 3px;
+      font-size: 9px;
+      text-align: center;
+      color: #fff;
+      background: #ee8a65;
+      z-index: 100;
+      top: 84%;
+      left: 20px;
+    }
+
+    #fly-ny {
+			position: fixed;
+      display: inline-block;
+      margin: 0px auto;
+      height: 30px;
+      padding: 5px;
+      border: none;
+      border-radius: 3px;
+      font-size: 9px;
+      text-align: center;
+      color: #fff;
+      background: #ee8a65;
+      z-index: 100;
+			top: 90%;
+      left: 20px;
+    }
+
+    .mapboxgl-popup {
+      max-width: 1000px;
+      font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+      z-index: 100;
+      display: flex;
+    }
+
+    strong {
+      display: inline;
+    }
+
+    p {
+      display: inline;
+    }
+  </style>
+</head>
+
+<body>
+  <button id="fly-sf">Fly to Moody's SF</button>
+  <button id="fly-ny">Fly to Moody's NY</button>
+
+  <div id="map"></div>
+
+  <div id="state-legend" class="legend">
+    <h4>Confirmed Cases</h4>
+    <div><span style="background-color: #5b0909;"></span>250,000</div>
+    <div><span style="background-color: #940a37;"></span>100,000</div>
+    <div><span style="background-color: #e26241;"></span>50,000</div>
+    <div><span style="background-color: #ffd369;"></span>10,000</div>
+    <div><span style="background-color: #f6eedf;"></span>0</div>
+  </div>
+
+  <div id="county-legend" class="legend" style="display: none;">
+    <h4>Confirmed Cases</h4>
+    <div><span style="background-color: #5b0909;"></span>50,000</div>
+    <div><span style="background-color: #940a37;"></span>10,000</div>
+    <div><span style="background-color: #e26241;"></span>1,000</div>
+    <div><span style="background-color: #ffd369;"></span>100</div>
+    <div><span style="background-color: #f6eedf;"></span>0</div>
+  </div>
+
+  <script>
+    mapboxgl.accessToken =
+      "pk.eyJ1IjoiYXJzaGlqdWphcmEiLCJhIjoiY2s3djZ0eXU0MDVoNDNmcWw0bjdwem80eCJ9.FVZGBovV50lCO1YeeNL87Q";
+    var map = new mapboxgl.Map({
+      container: "map",
+      style: "mapbox://styles/mapbox/light-v10", // https://docs.mapbox.com/mapbox-gl-js/example/setstyle/
+      center: [-98, 38.88],
+      minZoom: 3,
+      zoom: 3,
+    });
+
+    var zoomThreshold = 5;
+    var hoveredStateId = null;
+    var clickedStateId = null;
+
+    map.on("load", function() {
+      // data is updated as of May 27, 2020
+      map.addSource("county", {
+        type: "vector",
+        url: "mapbox://arshijujara.74c3l922",
+      });
+
+      map.addSource("state", {
+        type: "vector",
+        url: "mapbox://arshijujara.7pz4ikss",
+      });
+
+      map.addLayer({
+          id: "state",
+          source: "state",
+          "source-layer": "statecoviddata",
+          maxzoom: zoomThreshold, // display layer at zoom layers < zoomThreshold
+          type: "fill",
+          paint: {
+            "fill-color": [
+              "interpolate", // expression
+              ["linear"], // interpolation type - can be linear, exponential, cubic-bezier
+              ["get", "Confirmed"], // input - number, "get" is another expression
+              0, "#f6eedf", // stop input (number) followed by stop output (color)
+              10000, "#ffd369",
+              50000, "#e26241",
+              100000, "#940a37",
+              250000, "#5b0909",
+            ],
+            "fill-opacity": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              1,
+              0.75,
+            ],
+          },
+        },
+        "waterway-label" // beforeId - put this layer before 'waterway-label'
+      );
+
+      map.addLayer({
+          id: "county",
+          source: "county",
+          "source-layer": "countycoviddata",
+          minzoom: zoomThreshold, // display layer at zoom layers > zoomThreshold
+          type: "fill",
+          paint: {
+            "fill-color": [
+              "interpolate",
+              ["linear"],
+              ["get", "Confirmed"],
+              0, "#f6eedf",
+              100, "#ffd369",
+              1000, "#e26241",
+              10000, "#940a37",
+              50000, "#5b0909",
+            ],
+            "fill-opacity": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              1,
+              0.75,
+            ],
+          },
+        },
+        "waterway-label"
+      );
+
+      map.addLayer({
+          id: "county-line",
+          source: "county",
+          "source-layer": "countycoviddata",
+          minzoom: zoomThreshold,
+          type: "line",
+          paint: {
+            "line-color": [
+              "interpolate",
+              ["linear"],
+              ["get", "Confirmed"],
+              0, "#f6eedf",
+              100, "#ffd369",
+              1000, "#e26241",
+              10000, "#940a37",
+              50000, "#5b0909",
+            ],
+            "line-width": 1,
+          },
+        },
+        "waterway-label"
+      );
+
+      map.addLayer({
+          id: "state-line",
+          source: "state",
+          "source-layer": "statecoviddata",
+          maxzoom: zoomThreshold,
+          type: "line",
+          paint: {
+            "line-color": [
+              "interpolate",
+              ["linear"],
+              ["get", "Confirmed"],
+              0, "#f6eedf",
+              10000, "#ffd369",
+              50000, "#e26241",
+              100000, "#940a37",
+              250000, "#5b0909",
+            ],
+            "line-width": 2,
+          },
+        },
+        "waterway-label"
+      );
+
+      /***************************************** Hover *****************************************/
+      map.on("mousemove", "state", function(e) {
+        if (e.features.length > 0) {
+          if (hoveredStateId) {
+            map.setFeatureState({
+              source: "state",
+              sourceLayer: "statecoviddata",
+              id: hoveredStateId,
+            }, {
+              hover: false
+            });
+          }
+          hoveredStateId = e.features[0].id;
+          map.setFeatureState({
+            source: "state",
+            sourceLayer: "statecoviddata",
+            id: hoveredStateId
+          }, {
+            hover: true
+          });
+        }
+      });
+
+      map.on("mouseleave", "state", function() {
+        if (hoveredStateId) {
+          map.setFeatureState({
+            source: "state",
+            sourceLayer: "statecoviddata",
+            id: hoveredStateId
+          }, {
+            hover: false
+          });
+        }
+        hoveredStateId = null;
+      });
+
+      map.on("mousemove", "county", function(e) {
+        if (e.features.length > 0) {
+          if (hoveredStateId) {
+            map.setFeatureState({
+              source: "county",
+              sourceLayer: "countycoviddata",
+              id: hoveredStateId
+            }, {
+              hover: false
+            });
+          }
+          hoveredStateId = e.features[0].id;
+          map.setFeatureState({
+            source: "county",
+            sourceLayer: "countycoviddata",
+            id: hoveredStateId
+          }, {
+            hover: true
+          });
+        }
+      });
+
+      map.on("mouseleave", "county", function() {
+        if (hoveredStateId) {
+          map.setFeatureState({
+            source: "county",
+            sourceLayer: "countycoviddata",
+            id: hoveredStateId
+          }, {
+            hover: false
+          });
+        }
+        hoveredStateId = null;
+      });
+    });
+
+    /***************************************** Fly To *****************************************/
+    document.getElementById("fly-sf").addEventListener("click", function() {
+      map.flyTo({
+        center: [-122.39514, 37.78853],
+        zoom: 16,
+        essential: true,
+      });
+      map.setFilter("county", ["!=", "County", "San Francisco"]);
+    });
+
+    document.getElementById("fly-ny").addEventListener("click", function() {
+      map.flyTo({
+        center: [-74.0119, 40.71334],
+        zoom: 16,
+        essential: true,
+      });
+      map.setFilter("county", ["!=", "County", "New York City"]);
+    });
+
+    /***************************************** Popup *****************************************/
+    map.on("click", "state", function(e) {
+      numformat = new Intl.NumberFormat("en-US");
+      var state = e.features[0].properties.State;
+      var confirmed = numformat.format(e.features[0].properties.Confirmed);
+      var deaths = numformat.format(e.features[0].properties.Deaths);
+      var recovered = numformat.format(e.features[0].properties.Recovered);
+      var tested = numformat.format(e.features[0].properties.People_Tested);
+      var hospitalized = numformat.format(
+        e.features[0].properties.People_Hospitalized
+      );
+      var mortalityrate = numformat.format(e.features[0].properties.Mortality_Rate);
+      var testingrate = numformat.format(e.features[0].properties.Testing_Rate);
+      var hospitalizationrate = numformat.format(
+        e.features[0].properties.Hospitalization_Rate
+      );
+
+      var popup =
+        "<h2>" +
+        state +
+        "</h2>" +
+        "<strong>Confirmed: </strong><p>" +
+        confirmed +
+        "</p></br>" +
+        "<strong>Deaths: </strong><p>" +
+        deaths +
+        "</p></br>" +
+        "<strong>Recovered: </strong><p>" +
+        recovered +
+        "</p></br>" +
+        "<strong>People Tested: </strong><p>" +
+        tested +
+        "</p></br>" +
+        "<strong>People Hospitalized: </strong><p>" +
+        hospitalized +
+        "</p></br>" +
+        "<strong>Mortality Rate: </strong><p>" +
+        mortalityrate +
+        "</p></br>" +
+        "<strong>Testing Rate: </strong><p>" +
+        testingrate +
+        "</p></br>" +
+        "<strong>Hospitalization Rate: </strong><p>" +
+        hospitalizationrate +
+        "</p>";
+
+      new mapboxgl.Popup()
+        .setLngLat([e.lngLat.lng, e.lngLat.lat])
+        .setHTML(popup)
+        .addTo(map);
+    });
+
+    map.on("click", "county", function(e) {
+      numformat = new Intl.NumberFormat("en-US");
+      var county = e.features[0].properties.County;
+      var state = e.features[0].properties.State;
+      var confirmed = numformat.format(e.features[0].properties.Confirmed);
+      var deaths = numformat.format(e.features[0].properties.Deaths);
+      var recovered = numformat.format(e.features[0].properties.Recovered);
+
+      var popup =
+        "<h2>" +
+        county +
+        ", " +
+        state +
+        "</h2>" +
+        "<strong>Confirmed: </strong><p>" +
+        confirmed +
+        "</p></br>" +
+        "<strong>Deaths: </strong><p>" +
+        deaths +
+        "</p></br>" +
+        "<strong>Recovered: </strong><p>" +
+        recovered +
+        "</p></br>";
+
+      new mapboxgl.Popup()
+        .setLngLat([e.lngLat.lng, e.lngLat.lat])
+        .setHTML(popup)
+        .addTo(map);
+    });
+
+    /***************************************** Highlight *****************************************/
+    map.on("click", "state", function(e) {
+      if (e.features.length > 0) {
+        if (clickedStateId) {
+          map.setFeatureState({
+            source: "state",
+            id: clickedStateId,
+            sourceLayer: "statecoviddata",
+          }, {
+            hover: false
+          });
+        }
+        clickedStateId = e.features[0].id;
+
+        map.setFeatureState({
+          source: "state",
+          id: clickedStateId,
+          sourceLayer: "statecoviddata",
+        }, {
+          hover: false
+        });
+      }
+
+      map.setFilter("state", ["!=", "State", e.features[0].properties.State]);
+    });
+
+    map.on("click", "county", function(e) {
+      if (e.features.length > 0) {
+        if (clickedStateId) {
+          map.setFeatureState({
+            source: "county",
+            id: clickedStateId,
+            sourceLayer: "countycoviddata",
+          }, {
+            hover: false
+          });
+        }
+        clickedStateId = e.features[0].id;
+
+        map.setFeatureState({
+          source: "county",
+          id: clickedStateId,
+          sourceLayer: "countycoviddata",
+        }, {
+          hover: false
+        });
+      }
+
+      map.setFilter("state", ["!=", "State", e.features[0].properties.State]);
+
+      map.setFilter(
+        "county",
+        ["!=", "County", e.features[0].properties.County],
+        ["!=", "State", e.features[0].properties.State]
+      );
+    });
+
+    map.on("click", "state", function(e) {
+      console.log(e.features);
+    });
+    map.on("click", "county", function(e) {
+      console.log(e.features);
+    });
+
+    var stateLegendEl = document.getElementById("state-legend");
+    var countyLegendEl = document.getElementById("county-legend");
+
+    map.on("zoom", function() {
+      if (map.getZoom() > zoomThreshold) {
+        stateLegendEl.style.display = "none";
+        countyLegendEl.style.display = "block";
+      } else {
+        stateLegendEl.style.display = "block";
+        countyLegendEl.style.display = "none";
+      }
+    });
+  </script>
+</body>
+
+</html>
