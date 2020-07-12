@@ -6,11 +6,13 @@ In this workshop, I gave an overview on the power of Mapbox and walked my cowork
 
 ![](map.png)
 
-
 Below you can find the steps to create this map for yourself.
 
+## COVID-19 Data
 
-> *End result: get state and county map layers to display on map.*
+The data used for this project was provided by [Johns Hopkins University](https://github.com/CSSEGISandData/COVID-19).
+
+I created and ran a Python script that used GeoPandas to convert these raw CSV files into GeoJSON files for use in Mapbox.
 
 ## 1. Start the server
 
